@@ -31,10 +31,9 @@ onnx_config = dict(
     opset_version=11,
     optimize=True,
     output_names=[
-        # 'dets',
-        # 'labels',
-        "score_map",
-        "image_score"
+        'dets',
+        'labels',
+        'masks'
     ],
     save_file='end2end.onnx',
     type='onnx')

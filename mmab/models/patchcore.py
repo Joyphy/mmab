@@ -52,8 +52,14 @@ class PatchCore(BaseModel):
         x = torch.concat(x, 1)
         x = self.project(x)
         if mode == "predict":
-            score_map, image_score = self.generate_scores_map(x, inputs.shape[-2:])
-            return score_map, image_score
+            B, _, H, W = inputs.shape
+            score_map, image_score = self.generate_scores_map(x, [H, W])
+            dets = torch.full((B, 1, 5), 0.0, dtype=torch.float32, device=x.device)
+            dets[..., 2] = W
+            dets[..., 3] = H
+            dets[..., 4] = image_score.unsqueeze(1)
+            labels = torch.zeros((B, 1), dtype=torch.int32, device=x.device)
+            return dets, labels, score_map
         return x
 
     def project(self, x):
@@ -71,8 +77,8 @@ class PatchCore(BaseModel):
                 self.compute_image_anomaly_score(distances[:, i, :]))
         distances = distances[0, :, :].reshape((B, H, W))
 
-        score_map = F.interpolate(distances.unsqueeze(1), size=out_shape, mode='bilinear', align_corners=False).squeeze(1)
-        return score_map, torch.stack(image_score)
+        score_map = F.interpolate(distances.unsqueeze(1), size=out_shape, mode='bilinear', align_corners=False)
+        return score_map, torch.stack(image_score, dim=0)
     
     def nearest_neighbors(self, embedding, n_neighbors: int=9):
         """Compare embedding Features with the memory bank to get Nearest Neighbours distance
