@@ -1,0 +1,1 @@
+python /root/corespace/mmab/tools/train.py /root/corespace/mmab/configs/patchcore_config.py --work-dir /root/corespace/mmab/workdirs/mmab_test
