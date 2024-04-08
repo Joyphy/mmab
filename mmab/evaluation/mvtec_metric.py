@@ -5,6 +5,7 @@ from skimage import measure
 
 from mmab.registry import METRICS
 
+from mmengine.logging import print_log
 from mmengine.evaluator import BaseMetric
 
 @METRICS.register_module()
@@ -14,8 +15,8 @@ class MVTecMetric(BaseMetric):
             self.results.append({
                 "gt_sem_seg": gt_info.gt_sem_seg.sem_seg.numpy(),
                 "gt": gt_info.gt,
-                "score_map": data_samples[0][i:i+1],
-                "image_score": data_samples[1][i:i+1]
+                "score_map": data_samples[i]["score_map"],
+                "image_score": data_samples[i]["image_score"]
             })
 
     def compute_metrics(self, results: list) -> dict:
@@ -24,7 +25,9 @@ class MVTecMetric(BaseMetric):
         # Normalization
         max_score, min_score = score_map.max(), score_map.min()
         score_map = (score_map - min_score) / (max_score - min_score)
-        print(f"max_score:{max_score} min_score:{min_score}")
+        print_log(
+            msg=f"max_score:{max_score} min_score:{min_score}",
+            logger="current")
         # calculate image-level ROC AUC score
         gt_list = np.asarray([each["gt"] for each in self.results])
         # TODO 参数置顶
@@ -35,7 +38,9 @@ class MVTecMetric(BaseMetric):
         b = precision + recall
         f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
         threshold = thresholds[np.argmax(f1)]
-        print(f"F1 image:{f1.max()} threshold:{max_score}")
+        print_log(
+            msg=f"F1 image:{f1.max()} threshold:{threshold}",
+            logger="current")
         gt_mask = np.asarray([each["gt_sem_seg"] for each in self.results], dtype=np.int64).squeeze()
         # TODO 参数置顶
         per_pixel_auroc = compute_roc_score(
@@ -48,13 +53,15 @@ class MVTecMetric(BaseMetric):
         b = precision + recall
         f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
         threshold = thresholds[np.argmax(f1)]
-        print(f"F1 pixel:{f1.max()} threshold:{max_score}")
+        print_log(
+            msg=f"F1 pixel:{f1.max()} threshold:{threshold}",
+            logger="current")
         # TODO 参数置顶
         total_PRO = compute_pro_score(gt_mask, score_map, 500, False) if True else None
         return {
-            "img_auroc": img_auroc,
-            "per_pixel_auroc": per_pixel_auroc,
-            "total_PRO": total_PRO
+            "Img_AUROC": img_auroc,
+            "Pixel_AUROC": per_pixel_auroc,
+            "PRO_score": total_PRO
         }
 
 def compute_roc_score(y_true: np.ndarray,

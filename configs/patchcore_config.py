@@ -2,12 +2,14 @@
 
 default_scope = "mmab"
 runner_type = "mmab.MemoryBankRunner"
+randomness = dict(seed=3)
 train_cfg = dict(type="MemoryBankTrainLoop", do_eval=True)
 val_cfg = dict(type="ValLoop")
 default_hooks = dict(
     checkpoint=dict(interval=1, type='CheckpointHook', save_param_scheduler=False, save_optimizer=False),
     logger=dict(interval=1, type='LoggerHook'),
     param_scheduler=None,
+    visualization=dict(type='ScoreMapVisualizationHook'),
 )
 train_dataloader = dict(
     batch_size=2,
@@ -19,7 +21,7 @@ train_dataloader = dict(
         type="MVTecDataset",
         is_train=True,
         is_random=True,
-        num=0,
+        num=20,
         data_root="/root/workspace/datasets/bottle",
         pipeline=[
             dict(backend_args=None, type='LoadImageFromFile'),
@@ -29,7 +31,7 @@ train_dataloader = dict(
         ])
 )
 val_dataloader = dict(
-    batch_size=1,
+    batch_size=2,
     num_workers=0,
     persistent_workers=False,
     drop_last=False,

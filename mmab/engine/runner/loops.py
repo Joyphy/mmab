@@ -65,4 +65,4 @@ class MemoryBankTrainLoop(BaseLoop):
 
     @property
     def max_iters(self):
-        return 10e10
+        return len(self.dataloader)

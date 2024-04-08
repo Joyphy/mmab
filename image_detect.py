@@ -6,5 +6,5 @@ checkpoint = "/root/corespace/mmab/workdirs/mmab_test/epoch_1.pth"
 
 model = init_detector(config, checkpoint, device="cuda:0", palette=[])
 result = inference_detector(model, image_path)
-print(result.shape)
+print(result.score_map.max())
 # print(result)

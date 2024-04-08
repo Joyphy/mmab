@@ -6,6 +6,7 @@ import numpy as np
 from mmab.registry import MODELS
 from mmengine.model import BaseModel
 from mmengine.logging import print_log
+from mmengine.structures import InstanceData
 
 from scipy.ndimage import gaussian_filter
 
@@ -16,10 +17,11 @@ class PatchCore(BaseModel):
     def __init__(self, backbone: dict, data_preprocessor=None, init_cfg=None, test_cfg=None):
         super().__init__(data_preprocessor, init_cfg)
         self.backbone = MODELS.build(backbone)
+        self.register_buffer("memory_bank", torch.zeros(0))
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs):
         try:
-            self.register_buffer("memory_bank", torch.zeros_like(state_dict["memory_bank"]))
+            self.register_buffer("memory_bank", torch.zeros_like(state_dict["memory_bank"], device=self.memory_bank.device))
         except:
             self.register_buffer("memory_bank", None)
         return super()._load_from_state_dict(state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs)
@@ -31,9 +33,14 @@ class PatchCore(BaseModel):
 
     def val_step(self, data):
         data = self.data_preprocessor(data, False)
-        score_map, image_score = self._run_forward(data, mode="predict")
+        dets, labels, masks = self._run_forward(data, mode="predict")
+        score_map = masks.squeeze(1)
+        image_score = dets[:, 0, 4]
         score_map = postprocess_score_map(score_map, gaussian_blur=True)
-        return score_map, image_score.cpu().numpy()
+        return InstanceData(
+            score_map=score_map,
+            image_score=image_score.cpu().numpy()
+        )
 
     def test_step(self, data):
         return self.val_step(data)
