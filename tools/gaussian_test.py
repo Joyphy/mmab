@@ -16,12 +16,15 @@ def gaussian_blur_torch(image, sigma=1.0, truncate=4.0):
     """使用PyTorch进行高斯模糊，包括反射填充"""
     radius = int(truncate * sigma + 0.5)
     size = 2 * radius + 1
-    kernel = gaussian_kernel(size, sigma).unsqueeze(0).unsqueeze(0)
+    kernel = gaussian_kernel(size, sigma)[None, None, :, :]
+    print(kernel.shape)
     kernel = kernel.repeat(image.shape[0], 1, 1, 1)
+    print(kernel.shape)
 
     # 应用反射填充
     padding = radius
     image_padded = F.pad(image.unsqueeze(0), (padding, padding, padding, padding), mode='reflect')
+    print(image_padded.shape)
     blurred_image = F.conv2d(image_padded, kernel, groups=image.shape[0])
     
     return blurred_image.squeeze(0)
@@ -37,8 +40,10 @@ print(test_image_torch.shape)
 
 # 应用自定义的PyTorch高斯模糊
 blurred_image_torch = gaussian_blur_torch(test_image_torch, sigma=1).numpy()
-print(blurred_image_scipy)
-print(blurred_image_torch)
+# print(blurred_image_scipy)
+# print(blurred_image_torch)
+print(blurred_image_scipy.min(), blurred_image_scipy.max(), blurred_image_scipy.mean())
+print(blurred_image_torch.min(), blurred_image_torch.max(), blurred_image_torch.mean())
 
 # 计算误差
 error = np.abs(blurred_image_scipy - blurred_image_torch).mean()

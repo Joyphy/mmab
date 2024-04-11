@@ -8,8 +8,6 @@ from mmengine.model import BaseModel
 from mmengine.logging import print_log
 from mmengine.structures import InstanceData
 
-from scipy.ndimage import gaussian_filter
-
 from ..utils import KCenterGreedy, cdist
 
 @MODELS.register_module()
@@ -18,6 +16,9 @@ class PatchCore(BaseModel):
         super().__init__(data_preprocessor, init_cfg)
         self.backbone = MODELS.build(backbone)
         self.register_buffer("memory_bank", torch.zeros(0))
+
+        gaussian_kernel_, self.gaussian_radius = gaussian_kernel(sigma=4.0)
+        self.register_buffer("gaussian_kernel", gaussian_kernel_)
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs):
         try:
@@ -36,9 +37,9 @@ class PatchCore(BaseModel):
         dets, labels, masks = self._run_forward(data, mode="predict")
         score_map = masks.squeeze(1)
         image_score = dets[:, 0, 4]
-        score_map = postprocess_score_map(score_map, gaussian_blur=True)
+        # score_map = postprocess_score_map(score_map, gaussian_blur=False) # 使用torch操作替代
         return InstanceData(
-            score_map=score_map,
+            score_map=score_map.cpu().numpy(),
             image_score=image_score.cpu().numpy()
         )
 
@@ -66,8 +67,18 @@ class PatchCore(BaseModel):
             dets[..., 3] = H
             dets[..., 4] = image_score.unsqueeze(1)
             labels = torch.zeros((B, 1), dtype=torch.int32, device=x.device)
+            score_map = self.postprocess_score_map_torch(score_map, gaussian_blur=True)
             return dets, labels, score_map
         return x
+    
+    def postprocess_score_map_torch(self, score_map, gaussian_blur=False):
+        if gaussian_blur:
+            padding = self.gaussian_radius
+            score_map_padded = F.pad(score_map, torch.tensor([padding, padding, padding, padding], dtype=torch.int32), mode='reflect')
+            blurred_score_map = F.conv2d(score_map_padded, self.gaussian_kernel)
+            return blurred_score_map
+        else:
+            return score_map
 
     def project(self, x):
         return x
@@ -128,6 +139,7 @@ class PatchCore(BaseModel):
         self.register_buffer("memory_bank", coreset)
 
 def postprocess_score_map(score_map, gaussian_blur=True):
+    from scipy.ndimage import gaussian_filter
     score_map = score_map.cpu().numpy()
     
     if gaussian_blur:
@@ -135,3 +147,13 @@ def postprocess_score_map(score_map, gaussian_blur=True):
             score_map[i] = gaussian_filter(score_map[i], sigma=4)
     
     return score_map
+
+def gaussian_kernel(sigma=1.0, truncate=4):
+    radius = int(truncate * sigma + 0.5)
+    size = 2 * radius + 1
+    """生成高斯核"""
+    axis = np.arange(-size // 2 + 1., size // 2 + 1.)
+    x, y = np.meshgrid(axis, axis)
+    kernel = np.exp(-(x**2 + y**2) / (2 * sigma**2))
+    kernel /= np.sum(kernel)
+    return torch.tensor(kernel, dtype=torch.float32)[None, None, :, :], radius

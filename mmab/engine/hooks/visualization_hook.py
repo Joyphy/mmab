@@ -18,10 +18,12 @@ class ScoreMapVisualizationHook(DetVisualizationHook):
                  draw: bool = False,
                  interval: int = 50,
                  score_thr: float = 0.5,
+                 origin_score_thr: float = None,
                  show: bool = False,
                  wait_time: float = 0.,
                  test_out_dir: Optional[str] = None,
                  backend_args: dict = None):
+        self.origin_score_thr = origin_score_thr
         super().__init__(draw, interval, score_thr, show, wait_time, test_out_dir, backend_args)
 
     def after_test_iter(self, runner, batch_idx: int, data_batch: dict, outputs) -> None:
@@ -35,17 +37,15 @@ class ScoreMapVisualizationHook(DetVisualizationHook):
 
         for i, gt_info in enumerate(data_batch["data_samples"]):
             self._test_index += 1
-            score_map = outputs.score_map[i]
-            max_score = score_map.max()
-            min_score = score_map.min()
-            score_map = (score_map - min_score) / (max_score - min_score)
             plot_fig(
                 test_img=data_batch["inputs"][i].numpy(),
-                scores=score_map,
-                gts=gt_info.gt_sem_seg.sem_seg.numpy(),
+                scores=outputs.score_map[i],
+                image_score=outputs.image_score[i].item(),
+                save_path=os.path.join(self.test_out_dir, f"{self._test_index:>05d}_" + osp.basename(gt_info.img_path)),
                 threshold=self.score_thr,
-                save_dir=self.test_out_dir,
-                save_name=f"{self._test_index:>05d}_" + osp.basename(gt_info.img_path),
+                origin_threshold=self.origin_score_thr,
+                gts=gt_info.gt_sem_seg.sem_seg.numpy(),
+                save_pic=True
             )
 
 def denormalization(x):
@@ -54,13 +54,22 @@ def denormalization(x):
 
 def plot_fig(test_img,
              scores,
-             gts,
+             save_path,
              threshold,
-             save_dir,
-             save_name,
-             save_pic=True):
-    vmax = scores.max() * 255.
-    vmin = scores.min() * 255.
+             image_score=None,
+             origin_threshold=None,
+             gts=None,
+             save_pic=True,
+             dpi=100):
+    max_score = scores.max()
+    min_score = scores.min()
+    title = f"image_score: {image_score:.3f}\nscore: max {max_score:.3f} min {min_score:.3f}  "
+    scores = (scores - min_score) / (max_score - min_score)
+    if origin_threshold is not None:
+        title += f"use origin_threshold {origin_threshold:.3f}"
+        threshold = (origin_threshold - min_score) / (max_score - min_score)
+    else:
+        title += f"use threshold {threshold:.3f}*({max_score:.3f}-{min_score:.3f})+{min_score:.3f}={threshold*(max_score-min_score)+min_score:.3f}"
     if gts is not None:
         with_gt = 1
     else:
@@ -77,7 +86,8 @@ def plot_fig(test_img,
     vis_img = mark_boundaries(img, mask, color=(1, 0, 0), mode='thick')
     fig_img, ax_img = plt.subplots(1, 4 + with_gt, figsize=(12, 3))
     fig_img.subplots_adjust(right=0.9)
-    norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+    plt.suptitle(title)
+    norm = matplotlib.colors.Normalize(vmin=0, vmax=255)
     for ax_i in ax_img:
         ax_i.axes.xaxis.set_visible(False)
         ax_i.axes.yaxis.set_visible(False)
@@ -112,8 +122,7 @@ def plot_fig(test_img,
     }
     cb.set_label('Anomaly Score', fontdict=font)
     if save_pic:
-        save_name = os.path.join(save_dir, save_name)
-        fig_img.savefig(save_name, dpi=100)
+        fig_img.savefig(save_path, dpi=dpi, bbox_inches='tight', pad_inches=0.1)
     else:
         plt.show()
     plt.close()

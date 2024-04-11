@@ -55,17 +55,21 @@ inputs, outputs, bindings, stream = allocate_buffers(engine)
 context = engine.create_execution_context()
 
 # Prepare input data
-input_data = np.random.rand(1, 3, 256, 256).astype(np.float32).ravel()
+# np.random.seed(3)
+# input_data = np.random.rand(1, 3, 256, 256).astype(np.float32).ravel()
+input_data = np.load("/root/corespace/mmab/x.npy").reshape((1, 3, 256, 256)).ravel()
 
 # Perform inference and measure time
-for i in range(10):
+for i in range(1):
     t0 = time.time()
     trt_outputs = infer(context, bindings, inputs, outputs, stream, input_data)
     t1 = time.time()
     print(f"TensorRT推理耗时为{(t1-t0)*1000:.2f} ms")
 
 # Assuming model has two outputs: score_map and image_score
-print(trt_outputs)
+print(trt_outputs[0].max())
+print(trt_outputs[0].min())
+print(trt_outputs[1])
 # score_map, image_score = trt_outputs
 # print("Score Map:", score_map.shape)
 # print("Image Score:", image_score.shape)
