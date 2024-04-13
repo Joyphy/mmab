@@ -55,12 +55,13 @@ def denormalization(x):
 def plot_fig(test_img,
              scores,
              save_path,
-             threshold,
+             threshold=None,
              image_score=None,
              origin_threshold=None,
              gts=None,
              save_pic=True,
              dpi=100):
+    assert (threshold is not None) or (origin_threshold is not None), "threshold和origin_threshold需要其中一个有值!"
     max_score = scores.max()
     min_score = scores.min()
     title = f"image_score: {image_score:.3f}\nscore: max {max_score:.3f} min {min_score:.3f}  "
@@ -75,7 +76,11 @@ def plot_fig(test_img,
     else:
         with_gt = 0
     img = test_img
-    img = denormalization(img)
+    if len(img.shape) == 2:
+        img = img[..., None]
+    elif img.shape[0] == 1 or img.shape[0] == 3:
+        img = denormalization(img)
+    assert img.shape[:2] == scores.shape, f"图片尺寸(w: {img.shape[1]}, h: {img.shape[0]})和score map(w: {scores.shape[1]}, h: {scores.shape[0]})尺寸需要一致"
     heat_map = scores * 255
     mask = scores
     mask[mask > threshold] = 1
@@ -86,7 +91,8 @@ def plot_fig(test_img,
     vis_img = mark_boundaries(img, mask, color=(1, 0, 0), mode='thick')
     fig_img, ax_img = plt.subplots(1, 4 + with_gt, figsize=(12, 3))
     fig_img.subplots_adjust(right=0.9)
-    plt.suptitle(title)
+    plt.suptitle(title, va='top', fontsize=10)
+    plt.subplots_adjust(top=0.80)
     norm = matplotlib.colors.Normalize(vmin=0, vmax=255)
     for ax_i in ax_img:
         ax_i.axes.xaxis.set_visible(False)

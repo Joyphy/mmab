@@ -13,8 +13,7 @@ class MVTecDataset(BaseDataset):
         self.is_train = is_train
         self.is_random = is_random
         self.num = num
-        self.dataset_root_path = os.path.dirname(data_root)
-        self.class_name = os.path.basename(data_root)
+        self.dataset_root = data_root
         super().__init__(data_root=data_root, pipeline=pipeline)
 
     def load_data_list(self) -> List[dict]:
@@ -38,18 +37,16 @@ class MVTecDataset(BaseDataset):
         return real_data_list
 
     def load_dataset_folder(self):
-        phase = 'train' if self.is_train else 'test'
         x, y, mask = [], [], []
 
-        img_dir = os.path.join(self.dataset_root_path, self.class_name, phase)
-        gt_dir = os.path.join(self.dataset_root_path, self.class_name,
+        gt_dir = os.path.join(self.dataset_root, "..",
                               'ground_truth')
 
-        img_types = sorted(os.listdir(img_dir))
+        img_types = sorted(os.listdir(self.dataset_root))
         for img_type in img_types:
 
             # load images
-            img_type_dir = os.path.join(img_dir, img_type)
+            img_type_dir = os.path.join(self.dataset_root, img_type)
             if not os.path.isdir(img_type_dir):
                 continue
             img_fpath_list = sorted([
@@ -63,7 +60,7 @@ class MVTecDataset(BaseDataset):
             if img_type == 'good':
                 y.extend([0] * len(img_fpath_list))
                 mask.extend([None] * len(img_fpath_list))
-            else:
+            elif not self.is_train:
                 y.extend([1] * len(img_fpath_list))
                 gt_type_dir = os.path.join(gt_dir, img_type)
                 img_fname_list = [

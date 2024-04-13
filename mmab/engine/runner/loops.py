@@ -47,7 +47,11 @@ class MemoryBankTrainLoop(BaseLoop):
             'after_train_iter',
             batch_idx=idx,
             data_batch=data_batch,
-            outputs={"特征图shape": out.shape[1]})
+            outputs={
+                "feat_H": out.shape[2],
+                "feat_W": out.shape[3],
+                "feat_C": out.shape[1],
+            })
         self._iter += 1
         return out
 

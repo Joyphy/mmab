@@ -1,12 +1,17 @@
-import cv2, time
+import cv2
 from mmab.infer import PatchCoreTRT
+from mmab.engine.hooks.visualization_hook import plot_fig
 
 if __name__ == "__main__":
-    model_trt = PatchCoreTRT(model_path="/root/corespace/mmab/workdirs/mmab_test/trt_engine", gaussian_blur=False, norm=False)
+    model_trt = PatchCoreTRT(model_path="/root/corespace/mmab/workdirs/mmab_test/trt_engine", device_id=0)
     image = cv2.imread("/root/workspace/datasets/bottle/test/broken_small/000.png")
-    image = cv2.resize(image, (256, 256))
-    for _ in range(100):
-        t0 = time.time()
-        image_score_trt, score_map_trt = model_trt(image)
-        t1 = time.time()
-        print(f"trt: {(t1 - t0)*1000:.2f} ms")
+    image_score_trt, score_map_trt = model_trt(image)
+    plot_fig(
+        test_img=image,
+        scores=score_map_trt,
+        save_path="./test_mask_trt.png",
+        threshold=0.5,
+        image_score=image_score_trt,
+        dpi=100
+    )
+    print("trt plot success!")

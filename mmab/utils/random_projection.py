@@ -28,8 +28,11 @@ class BaseRandomProjection:
         n_samples, n_features = embedding.shape
         if self.n_components == "auto":
             self.n_components_ = johnson_lindenstrauss_min_dim(n_samples=n_samples, eps=self.eps)
-            if self.n_components_ <= 0 or self.n_components_ > n_features:
+            # if self.n_components_ <= 0 or self.n_components_ > n_features:
+            if self.n_components_ <= 0:
                 raise ValueError(f"Invalid target dimension {self.n_components_} for eps={self.eps} and n_samples={n_samples}.")
+            elif self.n_components_ > n_features: # 允许升维
+                self.n_components_ = n_features
         else:
             self._validate_n_components(n_features)
         self.random_matrix = self._make_random_matrix(self.n_components_, n_features).to(embedding.device)

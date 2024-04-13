@@ -1,14 +1,12 @@
 from mmab.infer import PatchCoreTRT, PatchCoreTorch
-import cv2, time, sys, os
+import cv2, time, os
 import numpy as np
 
 if __name__ == "__main__":
-    model_trt = PatchCoreTRT(model_path="/root/corespace/mmab/workdirs/mmab_test/trt_engine", gaussian_blur=False, norm=False)
+    model_trt = PatchCoreTRT(model_path="/root/corespace/mmab/workdirs/mmab_test/trt_engine")
     model_torch = PatchCoreTorch(
         model_config="/root/corespace/mmab/configs/patchcore_config.py",
-        checkpoint="/root/corespace/mmab/workdirs/mmab_test/epoch_1.pth",
-        device="cuda:0"
-    )
+        checkpoint="/root/corespace/mmab/workdirs/mmab_test/epoch_1.pth")
     
     for group in os.walk("/root/workspace/datasets/bottle"):
         for each_file in group[2]:

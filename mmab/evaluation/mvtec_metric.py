@@ -10,6 +10,14 @@ from mmengine.evaluator import BaseMetric
 
 @METRICS.register_module()
 class MVTecMetric(BaseMetric):
+    def __init__(self, 
+                 eval_PRO=True, non_partial_AUC=False, eval_threshold_step=500,
+                 collect_device = 'cpu', prefix = None, collect_dir = None) -> None:
+        self.eval_PRO = eval_PRO
+        self.non_partial_AUC = non_partial_AUC
+        self.eval_threshold_step = eval_threshold_step
+        super().__init__(collect_device, prefix, collect_dir)
+
     def process(self, data_batch, data_samples) -> None:
         for i, gt_info in enumerate(data_batch["data_samples"]):
             self.results.append({
@@ -24,14 +32,19 @@ class MVTecMetric(BaseMetric):
         image_score = np.concatenate([each["image_score"] for each in self.results], axis=0)
         # Normalization
         max_score, min_score = score_map.max(), score_map.min()
+        print_log(
+            msg=f"image_score_max: {image_score.max():.4f} image_score_min: {image_score.min():.4f}, image_score_mean: {image_score.mean():.4f}",
+            logger="current")
+        print_log(
+            msg=f"score_map_max:{max_score:.4f} score_map_min:{min_score:.4f} score_map_mean: {score_map.mean():.4f}",
+            logger="current")
         score_map = (score_map - min_score) / (max_score - min_score)
         print_log(
-            msg=f"max_score:{max_score} min_score:{min_score}",
+            msg="score_map归一化完毕!",
             logger="current")
         # calculate image-level ROC AUC score
         gt_list = np.asarray([each["gt"] for each in self.results])
-        # TODO 参数置顶
-        img_auroc = compute_roc_score(gt_list, image_score, 500, False)
+        img_auroc = compute_roc_score(gt_list, image_score, self.eval_threshold_step, self.non_partial_AUC)
         # get optimal threshold
         precision, recall, thresholds = precision_recall_curve(gt_list, image_score)
         a = 2 * precision * recall
@@ -39,13 +52,12 @@ class MVTecMetric(BaseMetric):
         f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
         threshold = thresholds[np.argmax(f1)]
         print_log(
-            msg=f"F1 image:{f1.max()} threshold:{threshold}",
+            msg=f"F1 image:{f1.max():.4f} threshold:{threshold:.4f}",
             logger="current")
         gt_mask = np.asarray([each["gt_sem_seg"] for each in self.results], dtype=np.int64).squeeze()
-        # TODO 参数置顶
         per_pixel_auroc = compute_roc_score(
             gt_mask.flatten(),
-            score_map.flatten(), 500, False)
+            score_map.flatten(), self.eval_threshold_step, self.non_partial_AUC)
         # get optimal threshold
         precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(),
                                                         score_map.flatten())
@@ -54,10 +66,9 @@ class MVTecMetric(BaseMetric):
         f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
         threshold = thresholds[np.argmax(f1)]
         print_log(
-            msg=f"F1 pixel:{f1.max()} threshold:{threshold}",
+            msg=f"F1 pixel:{f1.max():.4f} threshold:{threshold:.4f}",
             logger="current")
-        # TODO 参数置顶
-        total_PRO = compute_pro_score(gt_mask, score_map, 500, False) if True else None
+        total_PRO = compute_pro_score(gt_mask, score_map, self.eval_threshold_step, self.non_partial_AUC) if self.eval_PRO else None
         return {
             "Img_AUROC": img_auroc,
             "Pixel_AUROC": per_pixel_auroc,

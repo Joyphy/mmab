@@ -12,13 +12,23 @@ from ..utils import KCenterGreedy, cdist
 
 @MODELS.register_module()
 class PatchCore(BaseModel):
-    def __init__(self, backbone: dict, data_preprocessor=None, init_cfg=None, test_cfg=None):
+    def __init__(self, backbone: dict, data_preprocessor=None, init_cfg=None, train_cfg=None, test_cfg=None):
         super().__init__(data_preprocessor, init_cfg)
+        self.default_train_cfg = dict(
+            feat_concat=[1, 2],
+            pool_size=3,
+            gaussian_blur=True,
+            sigma=4.0,
+            n_neighbors=9,
+            k_ratio=10,
+        )
+        if train_cfg is not None:
+            self.default_train_cfg.update(train_cfg)
+
         self.backbone = MODELS.build(backbone)
         self.register_buffer("memory_bank", torch.zeros(0))
 
-        gaussian_kernel_, self.gaussian_radius = gaussian_kernel(sigma=4.0)
-        self.register_buffer("gaussian_kernel", gaussian_kernel_)
+        self.gaussian_kernel_, self.gaussian_radius = gaussian_kernel(sigma=self.default_train_cfg["sigma"])
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs):
         try:
@@ -37,26 +47,24 @@ class PatchCore(BaseModel):
         dets, labels, masks = self._run_forward(data, mode="predict")
         score_map = masks.squeeze(1)
         image_score = dets[:, 0, 4]
-        # score_map = postprocess_score_map(score_map, gaussian_blur=False) # 使用torch操作替代
         return InstanceData(
             score_map=score_map.cpu().numpy(),
-            image_score=image_score.cpu().numpy()
-        )
+            image_score=image_score.cpu().numpy())
 
     def test_step(self, data):
         return self.val_step(data)
 
     def forward(self, inputs, data_samples=None, mode: str = 'tensor'):
-        pool = torch.nn.AvgPool2d(3, 1, 1, count_include_pad=True)
+        pool = torch.nn.AvgPool2d(self.default_train_cfg["pool_size"], 1, self.default_train_cfg["pool_size"]//2, count_include_pad=True)
         outputs = self.backbone(inputs)
 
-        layer_indexs = [2, 3]
+        layer_indexs = sorted(self.default_train_cfg["feat_concat"])
         x = []
         for i, l in enumerate(layer_indexs):
             if i != 0:
-                x.append(F.interpolate(pool(outputs[l-1]), scale_factor=2**(layer_indexs[i] - layer_indexs[0]), mode="nearest"))
+                x.append(F.interpolate(pool(outputs[l]), scale_factor=2**(layer_indexs[i] - layer_indexs[0]), mode="nearest"))
             else:
-                x.append(pool(outputs[l-1]))
+                x.append(pool(outputs[l]))
         x = torch.concat(x, 1)
         x = self.project(x)
         if mode == "predict":
@@ -67,15 +75,17 @@ class PatchCore(BaseModel):
             dets[..., 3] = H
             dets[..., 4] = image_score.unsqueeze(1)
             labels = torch.zeros((B, 1), dtype=torch.int32, device=x.device)
-            score_map = self.postprocess_score_map_torch(score_map, gaussian_blur=True)
+            score_map = self.postprocess_score_map_torch(score_map, gaussian_blur=self.default_train_cfg["gaussian_blur"])
             return dets, labels, score_map
         return x
     
     def postprocess_score_map_torch(self, score_map, gaussian_blur=False):
         if gaussian_blur:
             padding = self.gaussian_radius
-            score_map_padded = F.pad(score_map, torch.tensor([padding, padding, padding, padding], dtype=torch.int32), mode='reflect')
-            blurred_score_map = F.conv2d(score_map_padded, self.gaussian_kernel)
+            score_map_padded = F.pad(score_map, [padding, padding, padding, padding], mode='reflect')
+            if self.gaussian_kernel_.device != score_map_padded.device:
+                self.gaussian_kernel_ = self.gaussian_kernel_.to(score_map_padded.device)
+            blurred_score_map = F.conv2d(score_map_padded, self.gaussian_kernel_)
             return blurred_score_map
         else:
             return score_map
@@ -87,7 +97,7 @@ class PatchCore(BaseModel):
         # Nearest Neighbours distances
         B, C, H, W = embedding.shape
         embedding = embedding.permute((0, 2, 3, 1)).reshape((B, H * W, C))
-        distances = self.nearest_neighbors(embedding=embedding, n_neighbors=9)
+        distances = self.nearest_neighbors(embedding=embedding, n_neighbors=self.default_train_cfg["n_neighbors"])
         distances = distances.permute((2, 0, 1))  # n_neighbors, B, HW
         image_score = []
         for i in range(B):
@@ -102,7 +112,6 @@ class PatchCore(BaseModel):
         """Compare embedding Features with the memory bank to get Nearest Neighbours distance
         """
         B, HW, C = embedding.shape
-        n_coreset = self.memory_bank.shape[0]
         distances = []
         for i in range(B):
             distances.append(cdist(embedding[i, :, :], self.memory_bank, p=2.0))
@@ -125,12 +134,15 @@ class PatchCore(BaseModel):
     def compute_stats(self, embedding: torch.Tensor):
         C = embedding.shape[1]
         embedding = embedding.permute((0, 2, 3, 1)).reshape((-1, C))
+        # 快速训练实验
+        # n = embedding.shape[0]
+        # return  self.register_buffer("memory_bank", embedding[:int(20*128*128*0.1), :])
         print_log(
             msg="Creating CoreSet Sampler via k-Center Greedy",
             logger="current")
-        sampler = KCenterGreedy(embedding, sampling_ratio=10 / 100)
+        sampler = KCenterGreedy(embedding, sampling_ratio=self.default_train_cfg["k_ratio"] / 100)
         print_log(
-            msg="Getting the coreset from the main embedding.",
+            msg=f"Getting the coreset from the main embedding. ratio: {self.default_train_cfg['k_ratio']}%",
             logger="current")
         coreset = sampler.sample_coreset()
         print_log(
@@ -138,6 +150,7 @@ class PatchCore(BaseModel):
             logger="current")  # 18032,384
         self.register_buffer("memory_bank", coreset)
 
+# 使用torch操作替代
 def postprocess_score_map(score_map, gaussian_blur=True):
     from scipy.ndimage import gaussian_filter
     score_map = score_map.cpu().numpy()

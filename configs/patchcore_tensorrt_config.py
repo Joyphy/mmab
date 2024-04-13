@@ -1,5 +1,5 @@
 backend_config = dict(
-    common_config=dict(fp16_mode=False, max_workspace_size=1073741824),
+    common_config=dict(fp16_mode=False, max_workspace_size=1<<33),
     model_inputs=[
         dict(
             input_shapes=dict(
