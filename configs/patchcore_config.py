@@ -80,7 +80,6 @@ test_dataloader = val_dataloader
 test_evaluator = val_evaluator
 test_cfg = dict(type="TestLoop")
 
-tnr_checkpoint = 'https://download.pytorch.org/models/resnet50-11ad3fa6.pth'
 model = dict(
     type="PatchCore",
     data_preprocessor=dict(
@@ -96,7 +95,6 @@ model = dict(
         depth=18,
         frozen_stages=1,
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet18'),
-        # init_cfg=dict(type='Pretrained', checkpoint='https://download.pytorch.org/models/resnet50-11ad3fa6.pth'),
         norm_cfg=dict(requires_grad=True, type='BN'),
         norm_eval=True,
         num_stages=4,

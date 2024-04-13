@@ -3,16 +3,16 @@ import cv2, time, os
 import numpy as np
 
 if __name__ == "__main__":
-    model_trt = PatchCoreTRT(model_path="/root/corespace/mmab/workdirs/mmab_test/trt_engine")
+    model_trt = PatchCoreTRT(model_path="/root/workspace/mmab_patchcore_examples/workdirs/mmab_test/trt_engine")
     model_torch = PatchCoreTorch(
-        model_config="/root/corespace/mmab/configs/patchcore_config.py",
-        checkpoint="/root/corespace/mmab/workdirs/mmab_test/epoch_1.pth")
+        model_config="/root/workspace/mmab_patchcore_examples/configs/patchcore_config.py",
+        checkpoint="/root/workspace/mmab_patchcore_examples/workdirs/mmab_test/epoch_1.pth")
     
     for group in os.walk("/root/workspace/datasets/bottle"):
         for each_file in group[2]:
             if each_file.endswith("png") and "mask" not in each_file:
                 image = cv2.imread(os.path.join(group[0], each_file))
-                image = cv2.resize(image, (256, 256))
+                image = cv2.resize(image, (256, 256)) # 修改到入网尺寸, 比较结果将更加接近
                 for _ in range(1):
                     t0 = time.time()
                     image_score_trt, score_map_trt = model_trt(image)
