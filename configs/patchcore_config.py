@@ -1,12 +1,8 @@
 # patchcore配置文件
 # 常用自定义参数
+user_random_seed = 3                   # 全局随机种子
 user_scale = (256, 256)                # 训练尺寸
 user_crop_size = (256, 256)            # 随机裁切尺寸
-user_score_thr = 0.5                   # 归一化阈值, 仅画图时生效
-user_origin_score_thr = None           # 原始阈值, 不为None时会屏蔽归一化阈值, 仅画图时生效
-user_random_seed = 3                   # 全局随机种子
-user_do_eval = True                    # 是否进行评估
-user_eval_PRO = True                   # 是否进行PRO评估, 没有mask缺陷测试集时可关闭
 user_train_cfg = dict(                 # 训练相关参数
     feat_concat=[1, 2],                # 合并哪些特征层的索引进行检测，大特征图检测小缺陷，小特征图检测大缺陷
     pool_size=3,                       # 局部特征融合范围, 即pooling大小, 只能为奇数
@@ -14,6 +10,11 @@ user_train_cfg = dict(                 # 训练相关参数
     sigma=4.0,                         # 值越大, 高斯模糊平均范围越大
     n_neighbors=9,                     # image_score参考多少topk分数, 较大幅度影响image_score值
     k_ratio=10)                        # memory_bank特征保留比例
+user_do_eval = True                    # 是否进行评估
+user_score_thr = 0.5                   # 归一化阈值, 仅画图时生效
+user_origin_score_thr = None           # 原始阈值, 不为None时会屏蔽归一化阈值, 仅画图时生效
+user_dpi = 100                         # plot画图的清晰程度, 仅画图时生效
+user_eval_PRO = True                   # 是否进行PRO评估, 没有mask缺陷测试集时可关闭
 user_is_resize_mask = True             # 是否将推理出的分数图还原成原始图片大小, 推理参数, 仅影响推理
 
 # 配置文件归属参数
@@ -26,7 +27,7 @@ default_hooks = dict(
     checkpoint=dict(interval=1, type='CheckpointHook', save_param_scheduler=False, save_optimizer=False),
     logger=dict(interval=1, type='LoggerHook'),
     param_scheduler=None,
-    visualization=dict(type='ScoreMapVisualizationHook', score_thr=user_score_thr, origin_score_thr=user_origin_score_thr),
+    visualization=dict(type='ScoreMapVisualizationHook', score_thr=user_score_thr, origin_score_thr=user_origin_score_thr, dpi=user_dpi),
 )
 train_dataloader = dict(
     batch_size=2,

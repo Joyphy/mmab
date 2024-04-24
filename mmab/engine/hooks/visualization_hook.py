@@ -20,9 +20,11 @@ class ScoreMapVisualizationHook(DetVisualizationHook):
                  score_thr: float = 0.5,
                  origin_score_thr: float = None,
                  show: bool = False,
+                 dpi: int = 100,
                  wait_time: float = 0.,
                  test_out_dir: Optional[str] = None,
                  backend_args: dict = None):
+        self.dpi = dpi
         self.origin_score_thr = origin_score_thr
         super().__init__(draw, interval, score_thr, show, wait_time, test_out_dir, backend_args)
 
@@ -45,7 +47,8 @@ class ScoreMapVisualizationHook(DetVisualizationHook):
                 threshold=self.score_thr,
                 origin_threshold=self.origin_score_thr,
                 gts=gt_info.gt_sem_seg.sem_seg.numpy(),
-                save_pic=True
+                save_pic=True,
+                dpi=self.dpi
             )
 
 def denormalization(x):

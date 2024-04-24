@@ -12,7 +12,7 @@ os.system(" ".join([
     "python",
     "/root/corespace/mmab/tools/test.py",
     f"{ROOTDIR}/configs/patchcore_config.py",
-    f"{ROOTDIR}/workdirs/mmab_test/epoch_1.pth"
+    f"{ROOTDIR}/workdirs/mmab_test/epoch_1.pth",
     "--work-dir",
     f"{ROOTDIR}/workdirs/mmab_test",
     "--show-dir test_show"

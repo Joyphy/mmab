@@ -1,0 +1,8 @@
+.vscode/
+**/__pycache__/
+**/*.png
+**/*.jpg
+**/*.npy
+workdirs/
+user_test/
+mmab_cmds.py

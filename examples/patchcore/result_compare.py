@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
                 image_score_err = abs(image_score_trt-image_score_torch)
                 score_map_err = np.abs(score_map_trt-score_map_torch).mean().item()
-                if (image_score_err > 1e-5 or score_map_err > 1e-4) or image_score_err == 0.0:
+                if (image_score_err > 1e-5 or score_map_err > 1e-4):
                     print(f"image_score误差: {image_score_err}")
                     print(f"score_map误差: {score_map_err}")
                 print("*"*50)
