@@ -16,7 +16,7 @@ class PatchCoreTorch():
         image_score = result.image_score.item()
         score_map = result.score_map.squeeze()
         if self.is_resize_mask_ and score_map.shape != image.shape[:2]:
-            score_map = imresize(score_map, image.shape[:2], backend="cv2")
+            score_map = imresize(score_map, image.shape[:2][::-1], backend="cv2")
         if self.norm:
             score_map = self._norm(score_map)
         return image_score, score_map
